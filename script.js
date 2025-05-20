@@ -9,6 +9,8 @@ const shareScreenButton = document.getElementById('shareScreen');
 const toggleVideoButton = document.getElementById('toggleVideo');
 const toggleAudioButton = document.getElementById('toggleAudio');
 const audioIcon = document.getElementById('audioIcon');
+const disconnectCallButton = document.getElementById('disconnectCall');
+
 let localStream;
 let peerConnection;
 let isCaller = false;
@@ -130,4 +132,34 @@ toggleAudioButton.onclick = () => {
   audioIcon.className = isAudioEnabled ? 'bi bi-mic-mute-fill' : 'bi bi-mic-fill';
   toggleAudioButton.classList.toggle('btn-danger', isAudioEnabled);
   toggleAudioButton.classList.toggle('btn-success', !isAudioEnabled);
+};
+disconnectCallButton.onclick = () => {
+  if (peerConnection) {
+    peerConnection.getSenders().forEach(sender => {
+      try {
+        sender.track && sender.track.stop();
+      } catch (e) {
+        console.warn('Track stop failed', e);
+      }
+    });
+
+    peerConnection.close();
+    peerConnection = null;
+  }
+
+  if (localStream) {
+    localStream.getTracks().forEach(track => track.stop());
+    localVideo.srcObject = null;
+    localStream = null;
+  }
+
+  if (remoteVideo.srcObject) {
+    remoteVideo.srcObject.getTracks().forEach(track => track.stop());
+    remoteVideo.srcObject = null;
+  }
+
+  remoteDescriptionSet = false;
+  iceCandidateBuffer = [];
+
+  console.log('Call disconnected.');
 };
