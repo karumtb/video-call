@@ -7,13 +7,15 @@ const remoteVideo = document.getElementById('remoteVideo');
 const startCallButton = document.getElementById('startCall');
 const shareScreenButton = document.getElementById('shareScreen');
 const toggleVideoButton = document.getElementById('toggleVideo');
-
+const toggleAudioButton = document.getElementById('toggleAudio');
+const audioIcon = document.getElementById('audioIcon');
 let localStream;
 let peerConnection;
 let isCaller = false;
 let remoteDescriptionSet = false;
 let iceCandidateBuffer = [];
 let isVideoEnabled = true;
+let isAudioEnabled = true;
 
 // === Create PeerConnection ===
 function createPeerConnection() {
@@ -114,4 +116,18 @@ toggleVideoButton.onclick = () => {
   videoTrack.enabled = isVideoEnabled;
 
   toggleVideoButton.textContent = isVideoEnabled ? 'Turn Video Off' : 'Turn Video On';
+};
+toggleAudioButton.onclick = () => {
+  if (!localStream) return;
+
+  const audioTrack = localStream.getAudioTracks()[0];
+  if (!audioTrack) return;
+
+  isAudioEnabled = !isAudioEnabled;
+  audioTrack.enabled = isAudioEnabled;
+
+  // Update icon and label
+  audioIcon.className = isAudioEnabled ? 'bi bi-mic-mute-fill' : 'bi bi-mic-fill';
+  toggleAudioButton.classList.toggle('btn-danger', isAudioEnabled);
+  toggleAudioButton.classList.toggle('btn-success', !isAudioEnabled);
 };
