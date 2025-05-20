@@ -4,10 +4,9 @@ const startCallButton = document.getElementById('startCall');
 const shareScreenButton = document.getElementById('shareScreen');
 
 const socket = io('https://socket-zhra.onrender.com', {
-  path: '/',
-  transports: ['websocket'],
-  secure: true
+  transports: ['websocket'], // Force WebSocket (optional, but recommended)
 });
+
 let localStream;
 let peer;
 
