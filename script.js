@@ -3,15 +3,15 @@ const remoteVideo = document.getElementById('remoteVideo');
 const startCallButton = document.getElementById('startCall');
 const shareScreenButton = document.getElementById('shareScreen');
 
-const socket = io('https://video-call-nu-pied.vercel.app/', {
-  path: '/socket'  // 👈 specify the custom socket path
-}); // Replace with IP of server machine
-
+const socket = io('https://socket-zhra.onrender.com', {
+  path: '/',
+  transports: ['websocket'],
+  secure: true
+});
 let localStream;
 let peer;
 
 socket.on('signal', async (data) => {
-  alert("Thiis is connect");
   if (data.type === 'offer') {
     await setupPeer(false);
     await peer.setRemoteDescription(new RTCSessionDescription(data.offer));
