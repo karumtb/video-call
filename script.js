@@ -1,73 +1,117 @@
+const socket = io('https://socket-zhra.onrender.com', {
+  transports: ['websocket'],
+});
+
 const localVideo = document.getElementById('localVideo');
 const remoteVideo = document.getElementById('remoteVideo');
 const startCallButton = document.getElementById('startCall');
 const shareScreenButton = document.getElementById('shareScreen');
-
-const socket = io('https://socket-zhra.onrender.com', {
-  transports: ['websocket'], // Force WebSocket (optional, but recommended)
-});
+const toggleVideoButton = document.getElementById('toggleVideo');
 
 let localStream;
-let peer;
+let peerConnection;
+let isCaller = false;
+let remoteDescriptionSet = false;
+let iceCandidateBuffer = [];
+let isVideoEnabled = true;
 
-socket.on('signal', async (data) => {
-  if (data.type === 'offer') {
-    await setupPeer(false);
-    await peer.setRemoteDescription(new RTCSessionDescription(data.offer));
-    const answer = await peer.createAnswer();
-    await peer.setLocalDescription(answer);
-    socket.emit('signal', { type: 'answer', answer });
-  }
+// === Create PeerConnection ===
+function createPeerConnection() {
+  const pc = new RTCPeerConnection();
 
-  if (data.type === 'answer') {
-    await peer.setRemoteDescription(new RTCSessionDescription(data.answer));
-  }
-
-  if (data.type === 'candidate') {
-    try {
-      await peer.addIceCandidate(new RTCIceCandidate(data.candidate));
-    } catch (err) {
-      console.error('Error adding received ice candidate', err);
-    }
-  }
-});
-
-async function setupPeer(isCaller) {
-  peer = new RTCPeerConnection();
-
-  peer.onicecandidate = (event) => {
+  pc.onicecandidate = (event) => {
     if (event.candidate) {
-      socket.emit('signal', { type: 'candidate', candidate: event.candidate });
+      socket.emit('signal', { type: 'ice-candidate', candidate: event.candidate });
     }
   };
 
-  peer.ontrack = (event) => {
+  pc.ontrack = (event) => {
     remoteVideo.srcObject = event.streams[0];
   };
 
+  return pc;
+}
+
+// === Handle Incoming Signal ===
+socket.on('signal', async (data) => {
+  switch (data.type) {
+    case 'offer':
+      if (!peerConnection) {
+        peerConnection = createPeerConnection();
+        localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
+      }
+      await peerConnection.setRemoteDescription(new RTCSessionDescription(data.offer));
+      remoteDescriptionSet = true;
+
+      const answer = await peerConnection.createAnswer();
+      await peerConnection.setLocalDescription(answer);
+
+      socket.emit('signal', { type: 'answer', answer });
+
+      for (const candidate of iceCandidateBuffer) {
+        await peerConnection.addIceCandidate(candidate);
+      }
+      iceCandidateBuffer = [];
+      break;
+
+    case 'answer':
+      await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
+      remoteDescriptionSet = true;
+
+      for (const candidate of iceCandidateBuffer) {
+        await peerConnection.addIceCandidate(candidate);
+      }
+      iceCandidateBuffer = [];
+      break;
+
+    case 'ice-candidate':
+      if (remoteDescriptionSet) {
+        try {
+          await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
+        } catch (err) {
+          console.error('Error adding ICE candidate:', err);
+        }
+      } else {
+        iceCandidateBuffer.push(new RTCIceCandidate(data.candidate));
+      }
+      break;
+  }
+});
+
+// === Start Call ===
+startCallButton.onclick = async () => {
   localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
   localVideo.srcObject = localStream;
 
-  localStream.getTracks().forEach((track) => {
-    peer.addTrack(track, localStream);
-  });
+  peerConnection = createPeerConnection();
 
-  if (isCaller) {
-    const offer = await peer.createOffer();
-    await peer.setLocalDescription(offer);
-    socket.emit('signal', { type: 'offer', offer });
-  }
-}
+  localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
 
-startCallButton.onclick = () => setupPeer(true);
+  isCaller = true;
+  const offer = await peerConnection.createOffer();
+  await peerConnection.setLocalDescription(offer);
 
+  socket.emit('signal', { type: 'offer', offer });
+};
+
+// === Share Screen ===
 shareScreenButton.onclick = async () => {
   const screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
   const screenTrack = screenStream.getVideoTracks()[0];
-  const sender = peer.getSenders().find(s => s.track.kind === 'video');
-  sender.replaceTrack(screenTrack);
+  const sender = peerConnection.getSenders().find(s => s.track.kind === 'video');
+  if (sender) sender.replaceTrack(screenTrack);
 
   screenTrack.onended = () => {
     sender.replaceTrack(localStream.getVideoTracks()[0]);
   };
+};
+
+// === Toggle Video ===
+toggleVideoButton.onclick = () => {
+  if (!localStream) return;
+  const videoTrack = localStream.getVideoTracks()[0];
+  isVideoEnabled = !isVideoEnabled;
+  videoTrack.enabled = isVideoEnabled;
+
+  toggleVideoButton.textContent = isVideoEnabled ? 'Turn Video Off' : 'Turn Video On';
 };
