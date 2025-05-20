@@ -11,6 +11,7 @@ let localStream;
 let peer;
 
 socket.on('signal', async (data) => {
+  alert("Thiis is connect");
   if (data.type === 'offer') {
     await setupPeer(false);
     await peer.setRemoteDescription(new RTCSessionDescription(data.offer));
