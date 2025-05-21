@@ -83,7 +83,7 @@ socket.on('signal', async (data) => {
 });
 
 // === Start Call ===
-startCallButton.onclick = async () => {
+(async () => {
   localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
   localVideo.srcObject = localStream;
 
@@ -95,8 +95,11 @@ startCallButton.onclick = async () => {
   const offer = await peerConnection.createOffer();
   await peerConnection.setLocalDescription(offer);
 
-  socket.emit('signal', { type: 'offer', offer });
-};
+  socket.emit('signal', { type: 'offer', offer });   
+})().catch(err => {
+    console.error(err);
+});
+
 
 // === Share Screen ===
 shareScreenButton.onclick = async () => {
